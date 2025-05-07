@@ -23,6 +23,7 @@ h5write("20250327_TSer3141_microglia.h5","/im",gfp)
 
 
 Step 2:
+
 Open "MyProject2.ilp" in Ilastik which is the trained ilastik file. Go to bottom where it says export new batch and load in new data
 
 Step 3:
