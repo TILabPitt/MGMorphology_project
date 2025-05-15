@@ -15,16 +15,21 @@ Processing steps:
 Step 1:
 
 Create a .h5 file of the maximum intensity projection of the GFP channel for each time frame for Ilastik segmentation. Make sure data is normalized 0-1 : 
+
 load('TSer03141_res.mat')
+
 vessel=squeeze(maxim_intc(:,:,2,:));gfp=squeeze(maxim_intc(:,:,3,:));
+
 vessel=volwlevel(vessel,[],1);gfp=volwlevel(gcamp,[],1);
+
 h5create("20250327_TSer3141_microglia.h5","/im",size(gfp))
+
 h5write("20250327_TSer3141_microglia.h5","/im",gfp)
 
 
 Step 2:
 
-Open "MyProject2.ilp" in Ilastik which is the trained ilastik file. Go to bottom where it says export new batch and load in new data
+Open "MyProject2.ilp" in Ilastik which is the trained ilastik file. Go to bottom where it says export new batch and load in new data. Note- if you wish to use the trained Ilastik model, please request the data which was trained for the model or else it will not work.
 
 Step 3:
 
