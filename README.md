@@ -18,6 +18,8 @@ Create a .h5 file of the maximum intensity projection of the GFP channel for eac
 
 load('TSer03141_res.mat')
 
+maxim_intc = squeeze(max(data,[],4));
+
 vessel=squeeze(maxim_intc(:,:,2,:));gfp=squeeze(maxim_intc(:,:,3,:));
 
 vessel=volwlevel(vessel,[],1);gfp=volwlevel(gcamp,[],1);
