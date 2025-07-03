@@ -165,12 +165,17 @@ for volind = 1:size(im2,3)
 
             skeletonizedMask = skeleton(paddedMask);%Find the skeleton! This uses msfm3d and rk4 files, which have been compiled and the .mexw64 versions included. If errors, re-run compilation of these files (in FastMarching_version3b folder), and add the folder and subfolders to path. 
             %Convert cell output of branches into one image for further processing.
-            WholeSkel=zeros(size(paddedMask));
-            WholeList = round(vertcat(skeletonizedMask{:}));
-            SkelIdx = sub2ind(size(paddedMask),WholeList(:,1),WholeList(:,2));
-            WholeSkel(SkelIdx)=1;
-            % Remove the 10-pixel padding from all sides
-            WholeSkel = WholeSkel(11:end-10, 11:end-10);
+            if ~isempty(skeletonizedMask)
+                WholeSkel=zeros(size(paddedMask));
+                WholeList = round(vertcat(skeletonizedMask{:}));
+                SkelIdx = sub2ind(size(paddedMask),WholeList(:,1),WholeList(:,2));
+                WholeSkel(SkelIdx)=1;
+                % Remove the 10-pixel padding from all sides
+                WholeSkel = WholeSkel(11:end-10, 11:end-10);
+            else
+                WholeSkel = [];
+            end
+
 
         else
             % If the mask doesn't touch the boundary, no need to pad
@@ -178,147 +183,154 @@ for volind = 1:size(im2,3)
 
             skeletonizedMask = skeleton(paddedMask);%Find the skeleton! This uses msfm3d and rk4 files, which have been compiled and the .mexw64 versions included. If errors, re-run compilation of these files (in FastMarching_version3b folder), and add the folder and subfolders to path. 
 
-            WholeSkel=zeros(size(ex));
-            WholeList = round(vertcat(skeletonizedMask{:}));
-            SkelIdx = sub2ind(size(ex),WholeList(:,1),WholeList(:,2));
-            WholeSkel(SkelIdx)=1;
+           
+
+            if ~isempty(skeletonizedMask)
+                WholeSkel=zeros(size(ex));
+                WholeList = round(vertcat(skeletonizedMask{:}));
+                SkelIdx = sub2ind(size(ex),WholeList(:,1),WholeList(:,2));
+                WholeSkel(SkelIdx)=1;
+            else
+                WholeSkel = [];
+            end
+    end
         end
-        
-        %check if skeleton got split up into multiple connected components
-        [labelMatrix, numObjects] = bwlabel(WholeSkel);
-        if numObjects>1
-            WholeSkel = connectpointsskeleton(WholeSkel);
-        end
+        if ~isempty(WholeSkel)
+            %check if skeleton got split up into multiple connected components
+            [labelMatrix, numObjects] = bwlabel(WholeSkel);
+            if numObjects>1
+                WholeSkel = connectpointsskeleton(WholeSkel);
+            end
 
-        %Microglia.SkelIdx{volind}{i}=SkelIdx;
-        Microglia.WholeSkel{volind}{i} = WholeSkel;
+            %Microglia.SkelIdx{volind}{i}=SkelIdx;
+            Microglia.WholeSkel{volind}{i} = WholeSkel;
         
 
-        [BoundedSkel, right, left, top, bottom]  = BoundingBoxOfCell(WholeSkel); %Create a bounding box around the skeleton and only analyze this area to significantly increase processing speed. 
-        si = size(BoundedSkel);
+            [BoundedSkel, right, left, top, bottom]  = BoundingBoxOfCell(WholeSkel); %Create a bounding box around the skeleton and only analyze this area to significantly increase processing speed. 
+            si = size(BoundedSkel);
 
-        % Find endpoints, and trace branches from endpoints to centroid    
-        i2 = floor(cent(i,:)); %From the calculated centroid, find the nearest positive pixel on the skeleton, so we know we're starting from a pixel with value 1.
-        closestPt = NearestPixel(WholeSkel,i2,1); %scale=1 for now
-        i2 = closestPt; %Coordinates of centroid (endpoint of line).
-        i2(:,1)=(i2(:,1))-left+1;
-        i2(:,2) = (i2(:,2))-bottom+1;
-        
-        endpts = (conv2(BoundedSkel,kernel,'same')==1)& BoundedSkel; %convolution, overlaying the kernel cube to see the sum of connected pixels.      
-        %endpts = bwmorph(BoundedImg, 'endpoints');
-        EndptList = find(endpts==1);
-        [r,c]=ind2sub(si,EndptList);%Output of ind2sub is row column plane
-        EndptList = [r c];
-        Microglia.numendpts{volind}{i} = length(EndptList);
-        %Microglia.vec_norm{volind}{i} = vecnorm_calc(EndptList,i2);
+            % Find endpoints, and trace branches from endpoints to centroid    
+            i2 = floor(cent(i,:)); %From the calculated centroid, find the nearest positive pixel on the skeleton, so we know we're starting from a pixel with value 1.
+            closestPt = NearestPixel(WholeSkel,i2,1); %scale=1 for now
+            i2 = closestPt; %Coordinates of centroid (endpoint of line).
+            i2(:,1)=(i2(:,1))-left+1;
+            i2(:,2) = (i2(:,2))-bottom+1;
+            
+            endpts = (conv2(BoundedSkel,kernel,'same')==1)& BoundedSkel; %convolution, overlaying the kernel cube to see the sum of connected pixels.      
+            %endpts = bwmorph(BoundedImg, 'endpoints');
+            EndptList = find(endpts==1);
+            [r,c]=ind2sub(si,EndptList);%Output of ind2sub is row column plane
+            EndptList = [r c];
+            Microglia.numendpts{volind}{i} = length(EndptList);
+            %Microglia.vec_norm{volind}{i} = vecnorm_calc(EndptList,i2);
             
         
-        masklist =zeros(si(1),si(2),length(EndptList));
-        ArclenOfEachBranch = zeros(length(EndptList),1);
+            masklist =zeros(si(1),si(2),length(EndptList));
+            ArclenOfEachBranch = zeros(length(EndptList),1);
 
-        for j=1:size(EndptList,1)%Loop through coordinates of endpoint.
-            i1 = EndptList(j,:); 
-            mask = ConnectPointsAlongPath(BoundedSkel,i1,i2);
-            masklist(:,:,j)=mask;
-            if any(size(mask)==1) & length(find(WholeSkel))<4
-                ArclenOfEachBranch(j,1) = NaN;
-            else
-                % Find the mask length in microns
-                pxlist = find(masklist(:,:,j)==1);%Find pixels that are 1s (branch)
-                distpoint = reorderpixellist(pxlist,si,i1,i2); %Reorder pixel lists so they're ordered by connectivity
-                %Convert the pixel coordinates by the scale to calculate arc length in microns.
-                distpoint(:,1) = distpoint(:,1); %If 1024 and downsampled, these scales have been adjusted
-                distpoint(:,2) = distpoint(:,2); %If 1024 and downsampled, these scales have been adjusted
-                if size(distpoint,1) < 2
+            for j=1:size(EndptList,1)%Loop through coordinates of endpoint.
+                i1 = EndptList(j,:); 
+                mask = ConnectPointsAlongPath(BoundedSkel,i1,i2);
+                masklist(:,:,j)=mask;
+                if any(size(mask)==1) & length(find(WholeSkel))<4
                     ArclenOfEachBranch(j,1) = NaN;
                 else
-                    [arclen,seglen] = arclength(distpoint(:,1),distpoint(:,2));%Use arc length function to calculate length of branch from coordinates
-                    ArclenOfEachBranch(j,1)=arclen; %Write the length in microns to a matrix where each row is the length of each branch, and each column is a different cell.
+                    % Find the mask length in microns
+                    pxlist = find(masklist(:,:,j)==1);%Find pixels that are 1s (branch)
+                    distpoint = reorderpixellist(pxlist,si,i1,i2); %Reorder pixel lists so they're ordered by connectivity
+                    %Convert the pixel coordinates by the scale to calculate arc length in microns.
+                    distpoint(:,1) = distpoint(:,1); %If 1024 and downsampled, these scales have been adjusted
+                    distpoint(:,2) = distpoint(:,2); %If 1024 and downsampled, these scales have been adjusted
+                    if size(distpoint,1) < 2
+                        ArclenOfEachBranch(j,1) = NaN;
+                    else
+                        [arclen,seglen] = arclength(distpoint(:,1),distpoint(:,2));%Use arc length function to calculate length of branch from coordinates
+                        ArclenOfEachBranch(j,1)=arclen; %Write the length in microns to a matrix where each row is the length of each branch, and each column is a different cell.
+                    end
                 end
             end
+
+
+            %Find average min, max, and avg branch lengths
+            if ~isempty(ArclenOfEachBranch)
+                Microglia.MaxBranchLength{volind}(i) = max(ArclenOfEachBranch);
+                Microglia.MinBranchLength{volind}(i) = min(ArclenOfEachBranch);
+                Microglia.AvgBranchLength{volind}(i) = mean(ArclenOfEachBranch,"omitnan");
+    
+    %             overlap_skel = zeros(length(ArclenOfEachBranch),1);
+    %             for k = 1:size(masklist,3)
+    %                 mask = masklist(:,:,k);
+    %                 mask_imgspace = RestoreToOriginalSpace(mask, right, left, top, bottom, sz); % restore branch of skeleton to image space from bonding box space
+    %                 se = strel('disk',3);
+    %                 dilated_branch = imdilate(mask_imgspace,se); % dilate branch
+    %                 mask_skel = ex.*dilated_branch; 
+    %                 overlap_skel(k) = any(ex(:) & vessel_processed(:)); %see if dilated skeleton is touching vessel
+    %                 %now I want to get the max arclength of a branch touching a vessel
+    %                 %and the minimum arclength of a branch not touching a vessel
+    %                 %and number of branches touching a vessel
+    %                 %and mean length of branches touching a vessel
+    %             end
+    %             if any(overlap_skel)
+    %                 finder = find(overlap_skel);
+    %                 finder_none = find(~overlap_skel);
+    %                 Microglia.MaxBranchLength_touchingvess{volind}(i) = max(ArclenOfEachBranch(finder));
+    %                 Microglia.AvgBranchLength_touchingvess{volind}(i) = mean(ArclenOfEachBranch(finder));  
+    %                 Microglia.TotalBranches_touchingvess{volind}(i) = length(ArclenOfEachBranch(finder));
+    %                 Microglia.TotalBranches_nottouchingvess{volind}(i) = length(ArclenOfEachBranch(finder_none));
+    %             else
+    %                 Microglia.MaxBranchLength_touchingvess{volind}(i) = NaN;
+    %                 Microglia.AvgBranchLength_touchingvess{volind}(i) = NaN;
+    %                 Microglia.TotalBranches_touchingvess{volind}(i) = NaN;
+    %                 Microglia.TotalBranches_nottouchingvess{volind}(i) = length(ArclenOfEachBranch); % all branches would not be touching a vessel
+    %             end
+    
+            else
+                Microglia.MaxBranchLength{volind}(i) = NaN;
+                Microglia.MinBranchLength{volind}(i) = NaN;
+                Microglia.AvgBranchLength{volind}(i) = NaN;  
+    %             Microglia.MaxBranchLength_touchingvess{volind}(i) = NaN;
+    %             Microglia.AvgBranchLength_touchingvess{volind}(i) = NaN;
+    %             Microglia.TotalBranches_touchingvess{volind}(i) = NaN;
+    %             Microglia.TotalBranches_nottouchingvess{volind}(i) = NaN;
+            end
+            %Microglia.ArclenOfEachBranch{volind}(i) = ArclenOfEachBranch;
+
+
+
+            fullmask = sum(masklist,3);%Add all masks to eachother, so have one image of all branches.
+            fullmask(fullmask(:,:,:)>3)=4;%So next for loop can work, replace all values higher than 3 with 4. Would need to change if want more than quaternary connectivity.
+            
+    
+            % Define branch level and display all on one colour-coded image.
+            pri = (fullmask(:,:,:))==4;
+            sec = (fullmask(:,:,:))==3;
+            tert = (fullmask(:,:,:))==2;
+            quat = (fullmask(:,:,:))==1;
+    
+             % Find branchpoints
+            brpts =zeros(si(1),si(2),3);
+            for kk=1:2 %For branchpoints not connected to end branches (ie. not distal branches). In fullmask, 1 is branch connected to end point, so anything greater than that is included. 
+            temp = (fullmask(:,:,:))>kk;
+            tempendpts = (conv2(temp,kernel,'same')==1)& temp; %Get all of the 'distal' endpoints of kk level branches
+            brpts(:,:,kk+1)=tempendpts;
+            end
+    
+            % Find any branchpoints of 1s onto 4s (ie. final branch coming off of main trunk). 
+            quatendpts = (conv2(quat,kernel,'same')==1)& quat; %convolution, overlaying the kernel cube onto final branches only.
+            quatbrpts = quatendpts - endpts; %Have points at both ends of final branches. Want to exclude any distal points (true endpoints)
+            %Only want to keep these quant branchpoints if they're connected to a 4(primary branch). Otherwise, the branch point will have been picked up in the previous for loop. 
+            fullrep= fullmask;
+            fullrep(fullrep(:,:)<4)=0;%Keep only the 4s, as 4s (don't convert to 1)
+            qbpts = fullrep+quatbrpts;%Add the two vectors, so should have 4s and 1s.
+            qbpts1 = convn(qbpts,ones([3 3]),'same'); %convolve with cube of ones to get 'connectivity'. All 1s 
+            brpts(:,:,1) = (quatbrpts.*qbpts1)>= 5;
+            allbranch = sum(brpts,3); %combine all levels of branches
+            BranchptList = find(allbranch==1);%Find how many pixels are 1s (branchpoints)
+            [r,c]=ind2sub(si,BranchptList);%Output of ind2sub is row column plane
+            BranchptList = [r c];
+            numbranchpts(i,:) = length(BranchptList);
+            Microglia.numbranchpts{volind}(i) = length(BranchptList);
         end
-
-
-        %Find average min, max, and avg branch lengths
-        if ~isempty(ArclenOfEachBranch)
-            Microglia.MaxBranchLength{volind}(i) = max(ArclenOfEachBranch);
-            Microglia.MinBranchLength{volind}(i) = min(ArclenOfEachBranch);
-            Microglia.AvgBranchLength{volind}(i) = mean(ArclenOfEachBranch,"omitnan");
-
-%             overlap_skel = zeros(length(ArclenOfEachBranch),1);
-%             for k = 1:size(masklist,3)
-%                 mask = masklist(:,:,k);
-%                 mask_imgspace = RestoreToOriginalSpace(mask, right, left, top, bottom, sz); % restore branch of skeleton to image space from bonding box space
-%                 se = strel('disk',3);
-%                 dilated_branch = imdilate(mask_imgspace,se); % dilate branch
-%                 mask_skel = ex.*dilated_branch; 
-%                 overlap_skel(k) = any(ex(:) & vessel_processed(:)); %see if dilated skeleton is touching vessel
-%                 %now I want to get the max arclength of a branch touching a vessel
-%                 %and the minimum arclength of a branch not touching a vessel
-%                 %and number of branches touching a vessel
-%                 %and mean length of branches touching a vessel
-%             end
-%             if any(overlap_skel)
-%                 finder = find(overlap_skel);
-%                 finder_none = find(~overlap_skel);
-%                 Microglia.MaxBranchLength_touchingvess{volind}(i) = max(ArclenOfEachBranch(finder));
-%                 Microglia.AvgBranchLength_touchingvess{volind}(i) = mean(ArclenOfEachBranch(finder));  
-%                 Microglia.TotalBranches_touchingvess{volind}(i) = length(ArclenOfEachBranch(finder));
-%                 Microglia.TotalBranches_nottouchingvess{volind}(i) = length(ArclenOfEachBranch(finder_none));
-%             else
-%                 Microglia.MaxBranchLength_touchingvess{volind}(i) = NaN;
-%                 Microglia.AvgBranchLength_touchingvess{volind}(i) = NaN;
-%                 Microglia.TotalBranches_touchingvess{volind}(i) = NaN;
-%                 Microglia.TotalBranches_nottouchingvess{volind}(i) = length(ArclenOfEachBranch); % all branches would not be touching a vessel
-%             end
-
-        else
-            Microglia.MaxBranchLength{volind}(i) = NaN;
-            Microglia.MinBranchLength{volind}(i) = NaN;
-            Microglia.AvgBranchLength{volind}(i) = NaN;  
-%             Microglia.MaxBranchLength_touchingvess{volind}(i) = NaN;
-%             Microglia.AvgBranchLength_touchingvess{volind}(i) = NaN;
-%             Microglia.TotalBranches_touchingvess{volind}(i) = NaN;
-%             Microglia.TotalBranches_nottouchingvess{volind}(i) = NaN;
-        end
-        %Microglia.ArclenOfEachBranch{volind}(i) = ArclenOfEachBranch;
-
-
-
-        fullmask = sum(masklist,3);%Add all masks to eachother, so have one image of all branches.
-        fullmask(fullmask(:,:,:)>3)=4;%So next for loop can work, replace all values higher than 3 with 4. Would need to change if want more than quaternary connectivity.
-        
-
-        % Define branch level and display all on one colour-coded image.
-        pri = (fullmask(:,:,:))==4;
-        sec = (fullmask(:,:,:))==3;
-        tert = (fullmask(:,:,:))==2;
-        quat = (fullmask(:,:,:))==1;
-
-         % Find branchpoints
-        brpts =zeros(si(1),si(2),3);
-        for kk=1:2 %For branchpoints not connected to end branches (ie. not distal branches). In fullmask, 1 is branch connected to end point, so anything greater than that is included. 
-        temp = (fullmask(:,:,:))>kk;
-        tempendpts = (conv2(temp,kernel,'same')==1)& temp; %Get all of the 'distal' endpoints of kk level branches
-        brpts(:,:,kk+1)=tempendpts;
-        end
-
-        % Find any branchpoints of 1s onto 4s (ie. final branch coming off of main trunk). 
-        quatendpts = (conv2(quat,kernel,'same')==1)& quat; %convolution, overlaying the kernel cube onto final branches only.
-        quatbrpts = quatendpts - endpts; %Have points at both ends of final branches. Want to exclude any distal points (true endpoints)
-        %Only want to keep these quant branchpoints if they're connected to a 4(primary branch). Otherwise, the branch point will have been picked up in the previous for loop. 
-        fullrep= fullmask;
-        fullrep(fullrep(:,:)<4)=0;%Keep only the 4s, as 4s (don't convert to 1)
-        qbpts = fullrep+quatbrpts;%Add the two vectors, so should have 4s and 1s.
-        qbpts1 = convn(qbpts,ones([3 3]),'same'); %convolve with cube of ones to get 'connectivity'. All 1s 
-        brpts(:,:,1) = (quatbrpts.*qbpts1)>= 5;
-        allbranch = sum(brpts,3); %combine all levels of branches
-        BranchptList = find(allbranch==1);%Find how many pixels are 1s (branchpoints)
-        [r,c]=ind2sub(si,BranchptList);%Output of ind2sub is row column plane
-        BranchptList = [r c];
-        numbranchpts(i,:) = length(BranchptList);
-        Microglia.numbranchpts{volind}(i) = length(BranchptList);
-
     end
 end
 
