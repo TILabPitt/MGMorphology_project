@@ -8,6 +8,8 @@ Ilastik for segmentation: https://www.ilastik.org/
 
 Accurate Fast Marching Matlab add-on: https://www.mathworks.com/matlabcentral/fileexchange/24531-accurate-fast-marching
 
+Note: once you install Accurate Fast Marching Matlab add-on, please replace "rk4.c", "shortestpath.m" and "skeleton.m" with the edited versions in this repository.
+
 
 
 Processing steps:
