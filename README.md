@@ -49,3 +49,8 @@ If needed, append your excel tables corresponding the each time series collected
 
 Step 6:
 Finally, combine all of your results together and specify sex, APOE statues, and file name in "Combine_allresults.m"
+
+
+Analysis:
+
+Use R script "MGMorph_quantifications_forGithub.R" and Matlab script "plotting_unique_trajectories.m" to perform subsequent analysis
