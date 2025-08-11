@@ -1,10 +1,9 @@
-
 clear;clc;close all;
-system('caffeinate &');
-
+% system('caffeinate &');
+% 
 
 %% Enter your segmented volumes as a dir list here 
-listdir_mg=dir('/Volumes/LaCie/MicrogliaProject_post2025/ilastik_microglia_processing/ilastik_processing03312025/*Prob*');
+listdir_mg=dir('Z:/Students/Yucheng/TwoPhoton/MGMorphology/MicrogliaProb/*Prob*');
 
 
 
@@ -40,37 +39,31 @@ for i = 1:length(listdir_mg)
     im2(im2<1)=0;
     im2 = uint8(im2);
     maxSlices = 20;
-    if size(im2,3)>=maxSlices
-        numSlices = size(im2,3); 
-        numSplits = ceil(numSlices/maxSlices);
-        if numSplits == 2
-            splitIdx = ceil(numSlices/2);
-            im_new = im2(:, :, 1:splitIdx);
-            Microglia  = MGMorph2D(im_new);
-            save([erase(listdir_mg(i).name,'.h5'),'_1'],'Microglia','-v7.3')
-            im_new2 = im2(:, :, splitIdx+1:end);
-            Microglia  = MGMorph2D(im_new2);
-            save([erase(listdir_mg(i).name,'.h5'),'_2'],'Microglia','-v7.3')
-        elseif numSplits == 3
-            splitIdx = ceil(numSlices/3);
-            im_new = im2(:, :, 1:splitIdx);
-            Microglia  = MGMorph2D(im_new);
-            save([erase(listdir_mg(i).name,'.h5'),'_1'],'Microglia','-v7.3')
-            im_new2 = im2(:, :, splitIdx+1:2*splitIdx);
-            Microglia  = MGMorph2D(im_new2);
-            save([erase(listdir_mg(i).name,'.h5'),'_2'],'Microglia','-v7.3')
-            im_new3 = im2(:, :, 2*splitIdx+1:end);
-            Microglia  = MGMorph2D(im_new3);
-            save([erase(listdir_mg(i).name,'.h5'),'_3'],'Microglia','-v7.3')
-        end
-    else
-        Microglia  = MGMorph2D(im2);
-        save(erase(listdir_mg(i).name,'.h5'),'Microglia','-v7.3')
-    end
+    % if size(im2,3) > maxSlices % YS changed it from >= to >, otherwise, when size(im2,3) == 20,data is skipped , agreed
+    %     numSlices = size(im2,3); 
+    %     numSplits = ceil(numSlices/maxSlices);
+    %     if numSplits == 2
+    %         splitIdx = ceil(numSlices/2);
+    %         im_new = im2(:, :, 1:splitIdx);
+    %         Microglia  = MGMorph2D(im_new);
+    %         save([erase(listdir_mg(i).name,'.h5'),'_1'],'Microglia','-v7.3')
+    %         im_new2 = im2(:, :, splitIdx+1:end);
+    %         Microglia  = MGMorph2D(im_new2);
+    %         save([erase(listdir_mg(i).name,'.h5'),'_2'],'Microglia','-v7.3')
+    %     elseif numSplits == 3
+    %         splitIdx = ceil(numSlices/3);
+    %         im_new = im2(:, :, 1:splitIdx);
+    %         Microglia  = MGMorph2D(im_new);
+    %         save([erase(listdir_mg(i).name,'.h5'),'_1'],'Microglia','-v7.3')
+    %         im_new2 = im2(:, :, splitIdx+1:2*splitIdx);
+    %         Microglia  = MGMorph2D(im_new2);
+    %         save([erase(listdir_mg(i).name,'.h5'),'_2'],'Microglia','-v7.3')
+    %         im_new3 = im2(:, :, 2*splitIdx+1:end);
+    %         Microglia  = MGMorph2D(im_new3);
+    %         save([erase(listdir_mg(i).name,'.h5'),'_3'],'Microglia','-v7.3')
+    %     end
+    % else
+     Microglia  = MGMorph2D(im2);
+     save(erase(listdir_mg(i).name,'.h5'),'Microglia','-v7.3')
+    
 end
-
-
-
-
-
-system('killall caffeinate');
